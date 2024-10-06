@@ -32,6 +32,7 @@ const picsFilter = ref({
   tags: [],
   upload: 'all'
 })
+const genThumbnailLoading = ref(false)
 const dragEl = ref(null)
 const editPicForm = ref({})
 const editPicVisible = ref(false)
@@ -195,6 +196,25 @@ const scanPicDir = () => {
     globalStore.fetchPicsList()
   })
 }
+const regenThumbnail = async () => {
+  genThumbnailLoading.value = true
+  await window.electron.ipcRenderer.invoke('regen-thumbnail')
+  genThumbnailLoading.value = false
+  globalStore.fetchPicsList()
+}
+const genThumbnailSpecificLoading = ref(false)
+const regenThumbnailSpecific = async (id) => {
+  genThumbnailSpecificLoading.value = true
+  const res = await window.electron.ipcRenderer.invoke('regen-thumbnail-specific', id)
+  genThumbnailSpecificLoading.value = false
+  if (res) {
+    Message.success('生成完成！')
+    editPicForm.value['thumbnail'] = res
+    globalStore.fetchPicsList()
+  } else {
+    Message.error('生成失败！')
+  }
+}
 const openPicsFolder = () => {
   window.electron.ipcRenderer.send('open-folder', 'pics')
 }
@@ -238,6 +258,14 @@ function removeStaticSuffix(staticPath) {
             <img @click="()=>{imagePreviewVisible=true;imagePreviewSrc=editPicForm.img}"
                  :src="judgeImagePath(editPicForm.img,projectPath)"
                  class="w-[250px] max-h-[250px] block object-contain object-left-top" />
+          </div>
+        </a-form-item>
+        <a-form-item field="img" label="缩略图" required>
+          <div class="w-full">
+            <a-textarea disabled v-model="editPicForm.thumbnail" class="w-[100%] block" />
+            <a-button :loading="genThumbnailSpecificLoading" @click="regenThumbnailSpecific(editPicForm.id)"
+                      type="primary">重新生成
+            </a-button>
           </div>
         </a-form-item>
         <a-form-item field="tags" label="标签" required>
@@ -284,7 +312,7 @@ function removeStaticSuffix(staticPath) {
           </a-col>
           <a-form-item field="selectedList" :label="`图片列表（已选择 ${ picsUploadSelectedKeys.length } 张）`" required>
             <a-button class="block" type="primary" @click="selectLocalPics">选择图片</a-button>
-<!--            <span class="ml-4">考虑到图片上传时间，请不要一次性选太多照片上传，可以分开多次。</span>-->
+            <!--            <span class="ml-4">考虑到图片上传时间，请不要一次性选太多照片上传，可以分开多次。</span>-->
           </a-form-item>
           <div class="w-full flex flex-wrap justify-items-start gap-1 max-h-[350px] overflow-y-scroll">
             <VueDraggable :animation="150" ref="dragEl" v-model="picsUploadSelectedKeys">
@@ -374,6 +402,13 @@ function removeStaticSuffix(staticPath) {
         </template>
         <!-- Use the default slot to avoid extra spaces -->
         <template #default>打开图片目录</template>
+      </a-button>
+      <a-button style="margin-left:10px;" type="primary" :loading="genThumbnailLoading" @click="regenThumbnail">
+        <template #icon>
+          <icon-file-image />
+        </template>
+        <!-- Use the default slot to avoid extra spaces -->
+        <template #default>重新生成没有的缩略图</template>
       </a-button>
     </div>
     <div class="flex flex-wrap justify-items-start align-middle items-center gap-1 mt-4">

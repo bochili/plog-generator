@@ -272,6 +272,106 @@ app.whenReady().then(() => {
   ipcMain.handle('get:port', async () => {
     return serverPort
   })
+
+  async function regenThumbnailBySpecificImg(picsData, imgKey, isSkip = false) {
+    const thumbnailPath = currentConfig.staticPath + thumbnailPicsDir + '/' + picsData[imgKey].thumbnail.split('/').pop()
+    if (picsData[imgKey].thumbnail && fs.existsSync(thumbnailPath)) {
+      if (isSkip) return false
+      try {
+        await fs.promises.unlink(thumbnailPath)
+      } catch (err) {
+        console.error('Error deleting file:', err)
+        return false
+      }
+      console.log(`Deleted ${thumbnailPath}`)
+    }
+    const uniqueThumbnailId = generateUniqueId()
+    let buffer = null
+    if (picsData[imgKey].img.startsWith('http')) {
+      console.log(`Downloading ${picsData[imgKey].img}`)
+      try {
+        const response = await fetch(picsData[imgKey].img)
+        if (!response.ok) throw new Error('网络请求失败')
+        buffer = await response.arrayBuffer()
+      } catch (e) {
+        console.log(e)
+        return false
+      }
+    } else {
+      buffer = await fs.promises.readFile(
+        currentConfig.staticPath + picsDir + '/' + picsData[imgKey].img.split('/').pop()
+      )
+    }
+    if (buffer === null) return false
+    try {
+      await sharp(buffer)
+        .resize(250, Math.round((picsData[imgKey]['size'][1] / picsData[imgKey]['size'][0]) * 250))
+        .toFile(
+          currentConfig.staticPath + thumbnailPicsDir + '/' + uniqueThumbnailId + '_' + picsData[imgKey]['filename'],
+          (err) => {
+            if (err) {
+              throw new Error(`Thumbnail ${picsData[imgKey]?.thumbnail} generated failed`)
+            } else {
+              console.log(`Thumbnail ${picsData[imgKey]?.thumbnail} generated`)
+              // picsData[imgKey].thumbnail = staticPath + 'thumbnails/' + uniqueThumbnailId + '_' + picsData[imgKey]['filename']
+            }
+          })
+    } catch (e) {
+      console.log(e)
+      return false
+    }
+    return staticPath + 'thumbnails/' + uniqueThumbnailId + '_' + picsData[imgKey]['filename']
+  }
+
+  ipcMain.handle('regen-thumbnail-specific', async (e, picId) => {
+    const picsData = await loadJson(currentConfig.staticPath + picsPath)
+    const res = await regenThumbnailBySpecificImg(picsData, picId)
+    console.log(res)
+    if (res) {
+      picsData[picId].thumbnail = res
+      fs.writeFileSync(currentConfig.staticPath + picsPath, JSON.stringify(picsData))
+      return res
+    }
+    return false
+  })
+  ipcMain.handle('regen-thumbnail', async (e) => {
+    // await clearDirectory(path.join(currentConfig.staticPath, thumbnailPicsDir))
+    const picsData = await loadJson(currentConfig.staticPath + picsPath)
+    fs.readdir("F:\\Projects\\Photography\\formyownuse\\staticData\\static\\pics\\thumbnails", (err, files) => {
+      if (err) {
+        return console.error('读取目录失败:', err)
+      }
+      for(const item of files){
+        let flag = false
+        for(const item2 of Object.values(picsData)){
+          if(item2.thumbnail.includes(item)){
+            flag = true
+          }
+        }
+        if(!flag){
+          console.log(item)
+        }
+      }
+    })
+    let errSum = 0
+    for (const item in picsData) {
+      try {
+        const res = await regenThumbnailBySpecificImg(picsData, item, true)
+        console.log(res)
+        if (res) {
+          picsData[item].thumbnail = res
+          fs.writeFileSync(currentConfig.staticPath + picsPath, JSON.stringify(picsData))
+        } else {
+          errSum++
+          console.log(`Thumbnail ${picsData[item].img} generated failed,or has already exists.`)
+        }
+      } catch (e) {
+        console.log(e)
+      }
+    }
+    console.log(`Generate Over. ${errSum}Skipped.`)
+    return true
+  })
   ipcMain.handle('generate', async (event, exportPath) => {
     await clearDirectory(path.join(exportPath))
     let res = await copyDirectory(
@@ -743,14 +843,15 @@ const server = createServer((req, res) => {
               } else {
                 picsData[uniqueId]['iso'] = ''
               }
+              const uniqueThumbnailId = generateUniqueId()
               await generateThumbnail(
                 currentConfig.staticPath + picsDir + '/' + file,
-                currentConfig.staticPath + thumbnailPicsDir + '/' + file,
+                currentConfig.staticPath + thumbnailPicsDir + '/' + uniqueThumbnailId + '_' + file,
                 250,
                 Math.round((picsData[uniqueId]['size'][1] / picsData[uniqueId]['size'][0]) * 250)
               )
                 .then((info) => {
-                  picsData[uniqueId].thumbnail = staticPath + 'thumbnails/' + file
+                  picsData[uniqueId].thumbnail = staticPath + 'thumbnails/' + uniqueThumbnailId + '_' + file
                   console.log(`Thumbnail ${picsData[uniqueId]?.thumbnail} generated`)
                 })
                 .catch((err) => {
