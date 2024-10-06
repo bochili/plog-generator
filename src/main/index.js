@@ -337,22 +337,6 @@ app.whenReady().then(() => {
   ipcMain.handle('regen-thumbnail', async (e) => {
     // await clearDirectory(path.join(currentConfig.staticPath, thumbnailPicsDir))
     const picsData = await loadJson(currentConfig.staticPath + picsPath)
-    fs.readdir("F:\\Projects\\Photography\\formyownuse\\staticData\\static\\pics\\thumbnails", (err, files) => {
-      if (err) {
-        return console.error('读取目录失败:', err)
-      }
-      for(const item of files){
-        let flag = false
-        for(const item2 of Object.values(picsData)){
-          if(item2.thumbnail.includes(item)){
-            flag = true
-          }
-        }
-        if(!flag){
-          console.log(item)
-        }
-      }
-    })
     let errSum = 0
     for (const item in picsData) {
       try {
