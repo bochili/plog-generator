@@ -2,7 +2,7 @@
 
 A simple & beautiful photography blog site generator, powered by Node.js and Electron.js.
 
-![image-20241005023220418](https://cdn.jsdelivr.net/gh/bochili/cdn3/photos/202410050232966.png)
+![Site Preview](https://cdn.jsdelivr.net/gh/bochili/cdn3/photos/202410051317224.png)
 
 ## 简介
 
